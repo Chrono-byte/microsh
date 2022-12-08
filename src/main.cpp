@@ -57,6 +57,13 @@ int main() {
 		// Variable for tracking if the command is an internal shell command and was already handled
 		bool handled = false;
 
+		// Check if the command is empty
+		if (command.empty()) {
+			handled = true;
+
+			continue;
+		}
+
 		// Expand tokens into the data stored at that token in the command
 		std::regex token_regex("\\$\\w+");
 
