@@ -1,13 +1,16 @@
-#include <unistd.h>
-
 #include <iostream>
-#include <sstream>
+#include <regex>
 #include <string>
-#include <vector>
+#include <unordered_map>
+
+#include "unistd.h"
+
+// Symbol table for storing text
+std::unordered_map<std::string, std::string> symbol_table;
 
 using namespace std;
 
-// split a string into a vector of strings using the specified delimiter
+// Splits a string into a vector of strings using the specified delimiter
 vector<string> split(const string& s, char delimiter) {
 	vector<string> tokens;
 	string token;
@@ -18,80 +21,120 @@ vector<string> split(const string& s, char delimiter) {
 	return tokens;
 }
 
-int processCommand(char* args[64], vector<string> command_args) {
-	// convert the command and its arguments to an array of c-strings
-	for (int i = 0; i < command_args.size(); i++) {
-		args[i] = &command_args[i][0];
+// Returns true if the program exists, false otherwise
+bool exists(const std::string& program) {
+	// Check if the program is in the PATH
+	if (getenv("PATH") == nullptr) {
+		return false;
 	}
-
-	// add a null pointer to the end of the array
-	args[command_args.size()] = NULL;
-
-	// execute the command
-	execvp(args[0], args);
-
-	return 0;
+	std::vector<std::string> paths = split(getenv("PATH"), ':');
+	for (const std::string& path : paths) {
+		if (access((path + "/" + program).c_str(), F_OK) == 0) {
+			return true;
+		}
+	}
+	return false;
 }
 
 int main() {
-	// the current working directory
-	string cwd;
-
-	// the prompt to display
-	string prompt;
-
-	// the command entered by the user
-	string command;
-
-	// the command and its arguments as a vector of strings
-	vector<string> command_args;
-
-	// the command and its arguments as an array of c-strings
-	char* args[64];
-
-	// continuously prompt the user for input
 	while (true) {
-		// get the current working directory
-		cwd = getcwd(NULL, 0);
+		// Print the command prompt
+		std::cout << "> ";
 
-		// construct the prompt string
-		prompt = cwd + " $ ";
+		// Read the command from standard input
+		std::string command;
+		std::getline(std::cin, command);
 
-		// print the prompt and read the command from the user
-		cout << prompt;
-		getline(cin, command);
+		// Variable for tracking if the command is an internal shell command and was already handled
+		bool handled = false;
 
-		// check for empty command and skip the rest of the program if it is
-		if (command.empty()) {
-			break;
-		} else {
-			continue;
+		// Expand tokens into the data stored at that token in the command
+		std::regex token_regex("\\$\\w+");
+
+		// Check thru entire command and if the any tokens exist in the symbol table, and if so, replace it in the string
+		for (auto it = std::sregex_iterator(command.begin(), command.end(), token_regex); it != std::sregex_iterator(); ++it) {
+			std::smatch match = *it;
+			std::string token = match.str();
+			if (symbol_table.count(token) > 0) {
+				command = std::regex_replace(command, token_regex, symbol_table[token]);
+			}
 		}
 
-		// split the command into individual arguments
-		command_args = split(command, ' ');
+		// Split the command into program and arguments
+		std::vector<std::string> tokens = split(command, ' ');
+		std::string program = tokens[0];
+		std::vector<std::string> args(tokens.begin() + 1, tokens.end());
 
-		if (command_args[0] == "exit") {
-			break;
-		}
-
-		if (command_args[0] == "cd") {
-			// change the current working directory to home if the user did not specify a directory
-			if (command_args[1].empty()) {
-				chdir(getenv("HOME"));
+		// Handle the "cd" command
+		if (program == "cd") {
+			// Check if a directory was specified
+			if (args.empty()) {
+				std::cerr << "cd: missing operand" << std::endl;
 				continue;
-			} else {
-				chdir(command_args[1].c_str());
+			}
+			// Try to change the current directory
+			if (chdir(args[0].c_str()) != 0) {
+				perror("cd");
 			}
 			continue;
+
+			handled = true;
 		}
 
-		if (command_args[0] == "pwd") {
-			cout << cwd << endl;
+		// Handle the "exit" command
+		if (program == "exit") {
+			handled = true;
+			break;
+		}
+
+		// Handle the "set" command for storing text in the symbol table
+		if (program == "set") {
+			// Check if a variable and value were specified
+			if (args.size() < 2) {
+				std::cerr << "set: missing operand" << std::endl;
+				continue;
+			}
+
+			// Check if the variable name is valid
+			if (args[0][0] == '$') {
+				// Store the value in the symbol table
+				symbol_table[args[0]] = args[1];
+			} else {
+				std::cerr << "set: missing operand" << std::endl;
+			}
+			continue;
+
+			handled = true;
+		}
+
+		// Handle other commands
+		// ...
+
+		// Check if the command was handled by an internal shell command, and if so skip the rest of the loop
+		if (handled) {
+			break;
+		}
+
+		// Check if the user requested program exists before executing the command
+		if (!exists(program)) {
+			std::cerr << program << ": command not found" << std::endl;
 			continue;
 		}
 
-		processCommand(args, command_args);
+		// Execute the command
+		int status = system(command.c_str());
+
+		// Check the exit status of the command
+		if (status == 0) {
+			// Command succeeded
+			// ...
+		} else if (status == 127) {
+			// Command not found
+			std::cerr << program << ": command not found" << std::endl;
+		} else {
+			// Command failed
+			// ...
+		}
 	}
 
 	return 0;
