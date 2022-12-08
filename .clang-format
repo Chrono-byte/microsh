@@ -1,0 +1,20 @@
+BasedOnStyle: Google
+AlignAfterOpenBracket: Align
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: false
+BraceWrapping:
+  BeforeElse: true
+BreakBeforeBraces: Attach
+ColumnLimit: 130
+DerivePointerAlignment: false
+IndentCaseLabels: true
+IndentWidth: 2
+Language: Cpp
+PointerAlignment: Left
+SortIncludes: true
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: ControlStatements
+SpacesBeforeTrailingComments: 1
+Standard: c++20
+TabWidth: 2
+UseTab: ForIndentation
