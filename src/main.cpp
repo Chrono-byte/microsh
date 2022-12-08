@@ -38,8 +38,17 @@ bool exists(const std::string& program) {
 
 int main() {
 	while (true) {
+		// get working directory
+		char cwd[1024];
+		if (getcwd(cwd, sizeof(cwd)) != nullptr) {
+			// Print the current working directory
+			// std::cout << cwd;
+		} else {
+			perror("getcwd() error");
+		}
+
 		// Print the command prompt
-		std::cout << "> ";
+		std::cout << cwd << " > ";
 
 		// Read the command from standard input
 		std::string command;
